@@ -1,5 +1,4 @@
 <?php
-<?php
 // Enkel PDO-anslutning — ändra användare/lösen om behövligt
 $dsn = 'mysql:host=127.0.0.1;dbname=copilottesting;charset=utf8mb4';
 $dbUser = 'root';
@@ -13,3 +12,4 @@ try {
 } catch (PDOException $e) {
     die('DB connection error: ' . $e->getMessage());
 }
+?>

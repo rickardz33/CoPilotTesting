@@ -57,14 +57,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
     <title>Välkommen</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+        body { font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto; padding: 0 1rem; }
+        .main-nav { background: #333; color: white; width: 100%; margin-bottom: 2rem; }
+        .nav-container { max-width: 720px; margin: 0 auto; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .logout-btn { color: white; text-decoration: none; padding: 0.5rem 1rem; background: #666; border-radius: 4px; }
+        .logout-btn:hover { background: #777; }
+        .brand { font-weight: bold; }
         .task { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0; border-bottom:1px solid #eee;}
         .task .text { flex:1; }
         .done { text-decoration:line-through; color:#888; }
@@ -73,6 +78,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     </style>
 </head>
 <body>
+    <?php require 'header.php'; ?>
+
     <h1>Hej!</h1>
     <p>Du är nu inloggad.</p>
 

@@ -5,18 +5,19 @@ if (!isset($_SESSION["logged_in"])) {
     exit;
 }
 
-// Enkel per-session lagring i JSON-fil
-$dataDir = __DIR__ . '/data';
-if (!is_dir($dataDir)) {
-    mkdir($dataDir, 0755, true);
-}
-$tasksFile = $dataDir . '/tasks_' . session_id() . '.json';
+require_once __DIR__ . '/db.php'; // PDO i $pdo
 
-// Läs in uppgifter
+$sid = session_id();
+
+// Läs in uppgifter från DB
 $tasks = [];
-if (file_exists($tasksFile)) {
-    $raw = file_get_contents($tasksFile);
-    $tasks = json_decode($raw, true) ?: [];
+try {
+    $stmt = $pdo->prepare('SELECT id, text, done, created FROM tasks WHERE session_id = :sid ORDER BY created DESC');
+    $stmt->execute([':sid' => $sid]);
+    $tasks = $stmt->fetchAll();
+} catch (Exception $e) {
+    // Vid fel, visa tom lista (eller logga)
+    $tasks = [];
 }
 
 // Hantera POST för att lägga till uppgift
@@ -24,13 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $text = isset($_POST['task']) ? trim($_POST['task']) : '';
     $text = strip_tags($text);
     if ($text !== '') {
-        $tasks[] = [
-            'id' => bin2hex(random_bytes(8)),
-            'text' => mb_substr($text, 0, 500),
-            'done' => false,
-            'created' => time()
-        ];
-        file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+        $id = bin2hex(random_bytes(8));
+        $created = time();
+        $stmt = $pdo->prepare('INSERT INTO tasks (id, session_id, text, done, created) VALUES (:id, :sid, :text, 0, :created)');
+        $stmt->execute([
+            ':id' => $id,
+            ':sid' => $sid,
+            ':text' => mb_substr($text, 0, 500),
+            ':created' => $created,
+        ]);
     }
     header('Location: welcome.php');
     exit;
@@ -39,23 +42,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Hantera toggle (markera som gjord/ogjord)
 if (isset($_GET['action']) && $_GET['action'] === 'toggle' && isset($_GET['id'])) {
     $id = $_GET['id'];
-    foreach ($tasks as &$t) {
-        if (isset($t['id']) && $t['id'] === $id) {
-            $t['done'] = !$t['done'];
-            break;
-        }
-    }
-    unset($t);
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+    $stmt = $pdo->prepare('UPDATE tasks SET done = 1 - done WHERE id = :id AND session_id = :sid');
+    $stmt->execute([':id' => $id, ':sid' => $sid]);
     header('Location: welcome.php');
     exit;
 }
 
-// Hantera radering (valfritt, lägger till enkelt sätt att ta bort)
+// Hantera radering
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $id = $_GET['id'];
-    $tasks = array_values(array_filter($tasks, fn($t) => ($t['id'] ?? '') !== $id));
-    file_put_contents($tasksFile, json_encode($tasks, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+    $stmt = $pdo->prepare('DELETE FROM tasks WHERE id = :id AND session_id = :sid');
+    $stmt->execute([':id' => $id, ':sid' => $sid]);
     header('Location: welcome.php');
     exit;
 }
@@ -76,14 +73,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     </style>
 </head>
 <body>
-    <h1>Hej Elgiganten!</h1>
+    <h1>Hej!</h1>
     <p>Du är nu inloggad.</p>
-    <a href="https://elgiganten.eu.qlikcloud.com/sense/app/376a5db8-f215-458a-b29f-0f9b54fd220e/sheet/10937a23-edbb-4916-ac1d-ca36d20b46ec/state/analysis">LÄNK</a>
 
     <section>
         <h2>Att göra</h2>
 
-        <!-- Formulär för att lägga till ny uppgift -->
         <form method="post" action="welcome.php">
             <input type="hidden" name="action" value="add">
             <input type="text" name="task" placeholder="Ny uppgift..." required maxlength="500" style="width:70%;">
@@ -100,14 +95,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
                             <?php echo htmlspecialchars($t['text'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
                         </div>
 
-                        <!-- Toggle via GET för enkel implementation -->
                         <form method="get" action="welcome.php" class="inline">
                             <input type="hidden" name="action" value="toggle">
                             <input type="hidden" name="id" value="<?php echo htmlspecialchars($t['id']); ?>">
                             <button type="submit"><?php echo !empty($t['done']) ? 'Ångra' : 'Markera klar'; ?></button>
                         </form>
 
-                        <!-- Ta bort -->
                         <form method="get" action="welcome.php" class="inline" onsubmit="return confirm('Ta bort uppgiften?');">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo htmlspecialchars($t['id']); ?>">

@@ -7,9 +7,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
 
     try {
-        $stmt = $pdo->prepare('SELECT id, password FROM users WHERE username = :username');
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch();
+
+        // Debug-utskrifter (ta bort i produktion)
+        echo "Användare hittad: " . ($user ? "Ja" : "Nej") . "<br>";
+        if ($user) {
+            echo "Lösenordskontroll: " . (password_verify($password, $user['password']) ? "OK" : "Fel") . "<br>";
+            echo "Sparat lösenord: " . $user['password'] . "<br>";
+        }
 
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION["logged_in"] = true;
@@ -18,12 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } else {
             echo "<h3>Fel användarnamn eller lösenord</h3>";
+            echo "<p>Användare: " . htmlspecialchars($username) . "</p>";
             echo "<a href='login.php'>Försök igen</a>";
         }
     } catch (PDOException $e) {
         // Logga felet säkert, visa användarvänligt meddelande
         error_log($e->getMessage());
-        echo "<h3>Ett fel uppstod</h3>";
+        echo "<h3>Ett fel uppstod: " . $e->getMessage() . "</h3>";
         echo "<a href='login.php'>Försök igen</a>";
     }
 }

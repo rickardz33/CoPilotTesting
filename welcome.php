@@ -9,6 +9,19 @@ require_once __DIR__ . '/db.php'; // PDO i $pdo
 
 $sid = session_id();
 
+// Hämta användarnamn om user_id finns i session
+$username = '';
+if (isset($_SESSION['user_id'])) {
+    try {
+        $stmt = $pdo->prepare('SELECT username FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $_SESSION['user_id']]);
+        $username = $stmt->fetchColumn() ?: '';
+    } catch (Exception $e) {
+        // ignorera fel här (eller logga)
+        $username = '';
+    }
+}
+
 // Läs in uppgifter från DB
 $tasks = [];
 try {
@@ -75,48 +88,49 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
         .done { text-decoration:line-through; color:#888; }
         form.inline { display:inline; margin:0; }
         .controls { margin-top:1rem; }
+        .task-list { margin-top: 2rem; }
+        .task-item { padding: 1rem; background: #f5f5f5; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .task-item.done { text-decoration: line-through; opacity: 0.6; }
+        .task-actions a { margin-left: 1rem; color: #d9534f; text-decoration: none; }
+        .task-actions a:hover { text-decoration: underline; }
+        form { margin: 2rem 0; }
+        input[type="text"] { width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; }
+        button { padding: 0.5rem 1rem; background: #333; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #555; }
     </style>
 </head>
 <body>
     <?php require 'header.php'; ?>
 
-    <h1>Hej!</h1>
+    <h1>Hej<?php echo $username ? ', ' . htmlspecialchars($username, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') : ''; ?>!</h1>
     <p>Du är nu inloggad.</p>
 
-    <section>
-        <h2>Att göra</h2>
+    <!-- Lägg till ny uppgift -->
+    <form method="POST">
+        <input type="hidden" name="action" value="add">
+        <input type="text" name="task" placeholder="Lägg till ny uppgift..." required>
+        <button type="submit">Lägg till</button>
+    </form>
 
-        <form method="post" action="welcome.php">
-            <input type="hidden" name="action" value="add">
-            <input type="text" name="task" placeholder="Ny uppgift..." required maxlength="500" style="width:70%;">
-            <button type="submit">Lägg till</button>
-        </form>
-
-        <div class="controls">
-            <?php if (empty($tasks)): ?>
-                <p>Inga uppgifter än.</p>
-            <?php else: ?>
-                <?php foreach ($tasks as $t): ?>
-                    <div class="task">
-                        <div class="text <?php echo !empty($t['done']) ? 'done' : ''; ?>">
-                            <?php echo htmlspecialchars($t['text'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
-                        </div>
-
-                        <form method="get" action="welcome.php" class="inline">
-                            <input type="hidden" name="action" value="toggle">
-                            <input type="hidden" name="id" value="<?php echo htmlspecialchars($t['id']); ?>">
-                            <button type="submit"><?php echo !empty($t['done']) ? 'Ångra' : 'Markera klar'; ?></button>
-                        </form>
-
-                        <form method="get" action="welcome.php" class="inline" onsubmit="return confirm('Ta bort uppgiften?');">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="id" value="<?php echo htmlspecialchars($t['id']); ?>">
-                            <button type="submit">Ta bort</button>
-                        </form>
+    <!-- Uppgiftslista -->
+    <div class="task-list">
+        <h2>Dina uppgifter</h2>
+        <?php if (count($tasks) > 0): ?>
+            <?php foreach ($tasks as $task): ?>
+                <div class="task-item <?php echo $task['done'] ? 'done' : ''; ?>">
+                    <span><?php echo htmlspecialchars($task['text']); ?></span>
+                    <div class="task-actions">
+                        <a href="?action=toggle&id=<?php echo $task['id']; ?>">
+                            <?php echo $task['done'] ? 'Ångra' : 'Markera klar'; ?>
+                        </a>
+                        <a href="?action=delete&id=<?php echo $task['id']; ?>" onclick="return confirm('Radera denna uppgift?');">Radera</a>
                     </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </div>
-    </section>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p>Inga uppgifter än. Lägg till en ny!</p>
+        <?php endif; ?>
+    </div>
+
 </body>
 </html>
